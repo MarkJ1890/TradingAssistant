@@ -15,7 +15,7 @@ def ensure_series(data, index):
         return pd.Series(dtype=float)
 
 def detect_pattern(df):
-    last_closes = df['Close'][-5:]
+    last_closes = df['Close'].iloc[-5:]  # FIX: correcte Series slicing
     if last_closes.is_monotonic_increasing:
         return "Breakout"
     elif last_closes.is_monotonic_decreasing:
@@ -49,14 +49,16 @@ def generate_signals(df):
     df['sma_fast'] = ensure_series(ta.trend.sma_indicator(close=close, window=20), df.index)
     df['sma_slow'] = ensure_series(ta.trend.sma_indicator(close=close, window=50), df.index)
 
-    last = df.iloc[-1]
+    last = df.iloc[[-1]]  # blijft DataFrame voor .iloc[0] op kolommen
+
     confidence = 0
     reasons = []
 
-    rsi = float(last['rsi'])
-    macd = float(last['macd'])
-    sma_fast = float(last['sma_fast'])
-    sma_slow = float(last['sma_slow'])
+    rsi = last['rsi'].iloc[0]
+    macd = last['macd'].iloc[0]
+    sma_fast = last['sma_fast'].iloc[0]
+    sma_slow = last['sma_slow'].iloc[0]
+    price = last['Close'].iloc[0]
 
     sentiment = "Neutral"
     if sma_fast > sma_slow and macd > 0:
@@ -89,7 +91,6 @@ def generate_signals(df):
         confidence += 20
         reasons.append("SMA 20 < SMA 50")
 
-    price = float(last['Close'])
     sl = tp = None
     if signal == 'LONG':
         sl = price * 0.98
