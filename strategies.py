@@ -1,35 +1,4 @@
-import ta
-import pandas as pd
-import numpy as np
-
-def ensure_series(data, index):
-    try:
-        if isinstance(data, pd.DataFrame):
-            return data.iloc[:, 0]
-        elif isinstance(data, np.ndarray) and data.ndim == 2 and data.shape[1] == 1:
-            return pd.Series(data[:, 0], index=index)
-        elif isinstance(data, pd.Series):
-            return data
-        return pd.Series(data, index=index)
-    except Exception:
-        return pd.Series(dtype=float)
-
-def detect_pattern(df):
-    last_closes = df['Close'].iloc[-5:]
-    if isinstance(last_closes, pd.DataFrame):
-        last_closes = last_closes.iloc[:, 0]
-    elif isinstance(last_closes, np.ndarray) and last_closes.ndim == 2:
-        last_closes = pd.Series(last_closes[:, 0])
-
-    if last_closes.is_monotonic_increasing:
-        return "Breakout"
-    elif last_closes.is_monotonic_decreasing:
-        return "Reversal"
-    elif abs(last_closes.pct_change().iloc[-1]) < 0.001:
-        return "Range"
-    return "No pattern"
-
-def generate_signals(df):
+def generate_signals(df, risk_eur=15, position_size=1):
     if df.empty or len(df) < 60:
         return {
             'signal': 'NO DATA',
@@ -39,7 +8,7 @@ def generate_signals(df):
             'reasons': ['Onvoldoende data beschikbaar'],
             'entry': None,
             'stoploss': None,
-            'takeprofit': None
+            'takeprofit': None,
         }
 
     df = df.copy()
@@ -54,10 +23,7 @@ def generate_signals(df):
     df['sma_fast'] = ensure_series(ta.trend.sma_indicator(close=close, window=20), df.index)
     df['sma_slow'] = ensure_series(ta.trend.sma_indicator(close=close, window=50), df.index)
 
-    last = df.iloc[[-1]]  # blijft DataFrame voor .iloc[0] op kolommen
-
-    confidence = 0
-    reasons = []
+    last = df.iloc[[-1]]
 
     rsi = last['rsi'].iloc[0]
     macd = last['macd'].iloc[0]
@@ -65,6 +31,8 @@ def generate_signals(df):
     sma_slow = last['sma_slow'].iloc[0]
     price = last['Close'].iloc[0]
 
+    confidence = 0
+    reasons = []
     sentiment = "Neutral"
     if sma_fast > sma_slow and macd > 0:
         sentiment = "Bullish"
@@ -96,15 +64,18 @@ def generate_signals(df):
         confidence += 20
         reasons.append("SMA 20 < SMA 50")
 
-    sl = tp = None
-    if signal == 'LONG':
-        sl = price * 0.98
-        tp = price * 1.03
-    elif signal == 'SHORT':
-        sl = price * 1.02
-        tp = price * 0.97
-
     pattern = detect_pattern(df)
+
+    # Reken stopafstand op basis van €15 risico
+    stopafstand = risk_eur / position_size
+    if signal == 'LONG':
+        sl = price - stopafstand
+        tp = price + stopafstand * 2
+    elif signal == 'SHORT':
+        sl = price + stopafstand
+        tp = price - stopafstand * 2
+    else:
+        sl = tp = None
 
     return {
         'signal': signal,
