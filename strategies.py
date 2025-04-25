@@ -14,11 +14,23 @@ def ensure_series(data, index):
     except Exception:
         return pd.Series(dtype=float)
 
+def detect_pattern(df):
+    last_closes = df['Close'][-5:]
+    if last_closes.is_monotonic_increasing:
+        return "Breakout"
+    elif last_closes.is_monotonic_decreasing:
+        return "Reversal"
+    elif abs(last_closes.pct_change().iloc[-1]) < 0.001:
+        return "Range"
+    return "No pattern"
+
 def generate_signals(df):
     if df.empty or len(df) < 60:
         return {
             'signal': 'NO DATA',
             'confidence': 0,
+            'sentiment': 'Neutral',
+            'pattern': 'N/A',
             'reasons': ['Onvoldoende data beschikbaar'],
             'entry': None,
             'stoploss': None,
@@ -46,6 +58,12 @@ def generate_signals(df):
     sma_fast = float(last['sma_fast'])
     sma_slow = float(last['sma_slow'])
 
+    sentiment = "Neutral"
+    if sma_fast > sma_slow and macd > 0:
+        sentiment = "Bullish"
+    elif sma_fast < sma_slow and macd < 0:
+        sentiment = "Bearish"
+
     if rsi < 30:
         signal = 'LONG'
         confidence += 30
@@ -72,18 +90,21 @@ def generate_signals(df):
         reasons.append("SMA 20 < SMA 50")
 
     price = float(last['Close'])
+    sl = tp = None
     if signal == 'LONG':
         sl = price * 0.98
         tp = price * 1.03
     elif signal == 'SHORT':
         sl = price * 1.02
         tp = price * 0.97
-    else:
-        sl = tp = None
+
+    pattern = detect_pattern(df)
 
     return {
         'signal': signal,
         'confidence': confidence,
+        'sentiment': sentiment,
+        'pattern': pattern,
         'reasons': reasons,
         'entry': round(price, 2),
         'stoploss': round(sl, 2) if sl else None,
