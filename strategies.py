@@ -1,10 +1,64 @@
-def generate_signals(df, risk_eur=15, position_size=1):
+import ta
+import pandas as pd
+import numpy as np
+import os
+
+def ensure_series(data, index):
+    try:
+        if isinstance(data, pd.DataFrame):
+            return data.iloc[:, 0]
+        elif isinstance(data, np.ndarray) and data.ndim == 2 and data.shape[1] == 1:
+            return pd.Series(data[:, 0], index=index)
+        elif isinstance(data, pd.Series):
+            return data
+        return pd.Series(data, index=index)
+    except Exception:
+        return pd.Series(dtype=float)
+
+def detect_pattern(df):
+    last_closes = df['Close'].iloc[-5:]
+    if isinstance(last_closes, pd.DataFrame):
+        last_closes = last_closes.iloc[:, 0]
+    elif isinstance(last_closes, np.ndarray) and last_closes.ndim == 2:
+        last_closes = pd.Series(last_closes[:, 0])
+    if last_closes.is_monotonic_increasing:
+        return "Breakout"
+    elif last_closes.is_monotonic_decreasing:
+        return "Reversal"
+    elif abs(last_closes.pct_change().iloc[-1]) < 0.001:
+        return "Range"
+    return "No pattern"
+
+def expected_direction(df):
+    recent = df['Close'].iloc[-20:]
+    trend = recent.pct_change().mean()
+    if trend > 0.001:
+        return "Uptrend"
+    elif trend < -0.001:
+        return "Downtrend"
+    return "Sideways"
+
+def log_prediction(ticker, signal, direction):
+    log_file = "prediction_log.csv"
+    entry = pd.DataFrame([{
+        "ticker": ticker,
+        "signal": signal,
+        "expected_direction": direction,
+        "timestamp": pd.Timestamp.now()
+    }])
+    if os.path.exists(log_file):
+        entry.to_csv(log_file, mode="a", header=False, index=False)
+    else:
+        entry.to_csv(log_file, index=False)
+
+def generate_signals(df, ticker="UNKNOWN"):
     if df.empty or len(df) < 60:
         return {
             'signal': 'NO DATA',
             'confidence': 0,
             'sentiment': 'Neutral',
             'pattern': 'N/A',
+            'expected_direction': 'N/A',
             'reasons': ['Onvoldoende data beschikbaar'],
             'entry': None,
             'stoploss': None,
@@ -24,7 +78,6 @@ def generate_signals(df, risk_eur=15, position_size=1):
     df['sma_slow'] = ensure_series(ta.trend.sma_indicator(close=close, window=50), df.index)
 
     last = df.iloc[[-1]]
-
     rsi = last['rsi'].iloc[0]
     macd = last['macd'].iloc[0]
     sma_fast = last['sma_fast'].iloc[0]
@@ -65,25 +118,18 @@ def generate_signals(df, risk_eur=15, position_size=1):
         reasons.append("SMA 20 < SMA 50")
 
     pattern = detect_pattern(df)
+    direction = expected_direction(df)
 
-    # Reken stopafstand op basis van €15 risico
-    stopafstand = risk_eur / position_size
-    if signal == 'LONG':
-        sl = price - stopafstand
-        tp = price + stopafstand * 2
-    elif signal == 'SHORT':
-        sl = price + stopafstand
-        tp = price - stopafstand * 2
-    else:
-        sl = tp = None
+    log_prediction(ticker, signal, direction)
 
     return {
         'signal': signal,
         'confidence': confidence,
         'sentiment': sentiment,
         'pattern': pattern,
+        'expected_direction': direction,
         'reasons': reasons,
         'entry': round(price, 2),
-        'stoploss': round(sl, 2) if sl else None,
-        'takeprofit': round(tp, 2) if tp else None,
+        'stoploss': None,
+        'takeprofit': None,
     }
