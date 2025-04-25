@@ -15,7 +15,12 @@ def ensure_series(data, index):
         return pd.Series(dtype=float)
 
 def detect_pattern(df):
-    last_closes = df['Close'].iloc[-5:]  # FIX: correcte Series slicing
+    last_closes = df['Close'].iloc[-5:]
+    if isinstance(last_closes, pd.DataFrame):
+        last_closes = last_closes.iloc[:, 0]
+    elif isinstance(last_closes, np.ndarray) and last_closes.ndim == 2:
+        last_closes = pd.Series(last_closes[:, 0])
+
     if last_closes.is_monotonic_increasing:
         return "Breakout"
     elif last_closes.is_monotonic_decreasing:
