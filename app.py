@@ -22,6 +22,8 @@ signal_info = generate_signals(data)
 st.subheader(f"📊 Analyse voor {ticker_label}")
 st.write(f"**Signaal**: `{signal_info['signal']}`")
 st.write(f"**Confidence**: {signal_info['confidence']}%")
+st.write(f"**Sentiment**: `{signal_info['sentiment']}`")
+st.write(f"**Patroon**: `{signal_info['pattern']}`")
 st.write("**Redenen**:")
 for reason in signal_info["reasons"]:
     st.markdown(f"- {reason}")
@@ -40,7 +42,14 @@ if not data.empty:
         close=data['Close'],
         name='Candles'
     ))
-    fig.update_layout(title="Prijsactie", height=500)
+    if signal_info['entry']:
+        fig.add_hline(y=signal_info['entry'], line_dash="dot", line_color="blue", annotation_text="Entry")
+    if signal_info['stoploss']:
+        fig.add_hline(y=signal_info['stoploss'], line_dash="dash", line_color="red", annotation_text="Stoploss")
+    if signal_info['takeprofit']:
+        fig.add_hline(y=signal_info['takeprofit'], line_dash="dash", line_color="green", annotation_text="Take Profit")
+
+    fig.update_layout(title="Prijsactie met trade levels", height=600)
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.warning("📉 Geen geldige data beschikbaar voor deze ticker.")
