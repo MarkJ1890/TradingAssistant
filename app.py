@@ -41,7 +41,6 @@ if not data.empty:
         close=data['Close'],
         name='Candles'
     ))
-
     fig.update_layout(title="Prijsactie", height=600)
     st.plotly_chart(fig, use_container_width=True)
 else:
