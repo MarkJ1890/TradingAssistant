@@ -32,6 +32,8 @@ def detect_pattern(df):
 def expected_direction(df):
     recent = df['Close'].iloc[-20:]
     trend = recent.pct_change().mean()
+    if isinstance(trend, pd.Series):
+        trend = trend.item()
     if trend > 0.001:
         return "Uptrend"
     elif trend < -0.001:
