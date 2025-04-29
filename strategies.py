@@ -1,137 +1,52 @@
 import ta
 import pandas as pd
 import numpy as np
-import os
 
-def ensure_series(data, index):
-    try:
-        if isinstance(data, pd.DataFrame):
-            return data.iloc[:, 0]
-        elif isinstance(data, np.ndarray) and data.ndim == 2 and data.shape[1] == 1:
-            return pd.Series(data[:, 0], index=index)
-        elif isinstance(data, pd.Series):
-            return data
-        return pd.Series(data, index=index)
-    except Exception:
-        return pd.Series(dtype=float)
-
-def detect_pattern(df):
-    last_closes = df['Close'].iloc[-5:]
-    if isinstance(last_closes, pd.DataFrame):
-        last_closes = last_closes.iloc[:, 0]
-    elif isinstance(last_closes, np.ndarray) and last_closes.ndim == 2:
-        last_closes = pd.Series(last_closes[:, 0])
-    if last_closes.is_monotonic_increasing:
-        return "Breakout"
-    elif last_closes.is_monotonic_decreasing:
-        return "Reversal"
-    elif abs(last_closes.pct_change().iloc[-1]) < 0.001:
-        return "Range"
-    return "No pattern"
-
-def expected_direction(df):
-    recent = df['Close'].iloc[-20:]
-    trend = recent.pct_change().mean()
-    if isinstance(trend, pd.Series):
-        trend = trend.item()
-    if trend > 0.001:
-        return "Uptrend"
-    elif trend < -0.001:
-        return "Downtrend"
-    return "Sideways"
-
-def log_prediction(ticker, signal, direction):
-    log_file = "prediction_log.csv"
-    entry = pd.DataFrame([{
-        "ticker": ticker,
-        "signal": signal,
-        "expected_direction": direction,
-        "timestamp": pd.Timestamp.now()
-    }])
-    if os.path.exists(log_file):
-        entry.to_csv(log_file, mode="a", header=False, index=False)
-    else:
-        entry.to_csv(log_file, index=False)
-
-def generate_signals(df, ticker="UNKNOWN"):
-    if df.empty or len(df) < 60:
-        return {
-            'signal': 'NO DATA',
-            'confidence': 0,
-            'sentiment': 'Neutral',
-            'pattern': 'N/A',
-            'expected_direction': 'N/A',
-            'reasons': ['Onvoldoende data beschikbaar'],
-            'entry': None,
-            'stoploss': None,
-            'takeprofit': None,
-        }
-
-    df = df.copy()
-    close = df['Close']
-    if isinstance(close, pd.DataFrame):
-        close = close.iloc[:, 0]
-    elif isinstance(close, np.ndarray) and close.ndim == 2 and close.shape[1] == 1:
-        close = pd.Series(close[:, 0], index=df.index)
-
-    df['rsi'] = ensure_series(ta.momentum.RSIIndicator(close=close).rsi(), df.index)
-    df['macd'] = ensure_series(ta.trend.MACD(close=close).macd_diff(), df.index)
-    df['sma_fast'] = ensure_series(ta.trend.sma_indicator(close=close, window=20), df.index)
-    df['sma_slow'] = ensure_series(ta.trend.sma_indicator(close=close, window=50), df.index)
-
-    last = df.iloc[[-1]]
-    rsi = last['rsi'].iloc[0]
-    macd = last['macd'].iloc[0]
-    sma_fast = last['sma_fast'].iloc[0]
-    sma_slow = last['sma_slow'].iloc[0]
-    price = last['Close'].iloc[0]
-
-    confidence = 0
-    reasons = []
-    sentiment = "Neutral"
-    if sma_fast > sma_slow and macd > 0:
-        sentiment = "Bullish"
-    elif sma_fast < sma_slow and macd < 0:
-        sentiment = "Bearish"
-
-    if rsi < 30:
-        signal = 'LONG'
-        confidence += 30
-        reasons.append("RSI < 30 (oversold)")
-    elif rsi > 70:
-        signal = 'SHORT'
-        confidence += 30
-        reasons.append("RSI > 70 (overbought)")
-    else:
-        signal = 'HOLD'
-
-    if macd > 0 and signal == 'LONG':
-        confidence += 20
-        reasons.append("MACD bullish")
-    elif macd < 0 and signal == 'SHORT':
-        confidence += 20
-        reasons.append("MACD bearish")
-
-    if sma_fast > sma_slow and signal == 'LONG':
-        confidence += 20
-        reasons.append("SMA 20 > SMA 50")
-    elif sma_fast < sma_slow and signal == 'SHORT':
-        confidence += 20
-        reasons.append("SMA 20 < SMA 50")
-
-    pattern = detect_pattern(df)
-    direction = expected_direction(df)
-
-    log_prediction(ticker, signal, direction)
-
+def get_highs_lows(df):
+    yesterday = df.iloc[:-24]
+    today = df.iloc[-24:]
     return {
-        'signal': signal,
-        'confidence': confidence,
-        'sentiment': sentiment,
-        'pattern': pattern,
-        'expected_direction': direction,
-        'reasons': reasons,
-        'entry': round(price, 2),
-        'stoploss': None,
-        'takeprofit': None,
+        'yesterday_high': round(yesterday['High'].max(), 2),
+        'yesterday_low': round(yesterday['Low'].min(), 2),
+        'today_high': round(today['High'].max(), 2),
+        'today_low': round(today['Low'].min(), 2),
+    }
+
+def detect_recent_candle_pattern(df):
+    last = df.iloc[-5:]
+    result = []
+    for i in range(1, len(last)):
+        open_prev = last['Open'].iloc[i-1]
+        close_prev = last['Close'].iloc[i-1]
+        open_now = last['Open'].iloc[i]
+        close_now = last['Close'].iloc[i]
+        if close_prev < open_prev and close_now > open_now and close_now > close_prev:
+            result.append("Bullish Engulfing")
+        elif close_prev > open_prev and close_now < open_now and close_now < close_prev:
+            result.append("Bearish Engulfing")
+    return result[-1] if result else "No clear pattern"
+
+def suggest_entry(df):
+    last = df.iloc[-1]
+    sma20 = ta.trend.sma_indicator(close=df['Close'], window=20).iloc[-1]
+    price = last['Close']
+    if price > sma20:
+        return {'type': 'LONG', 'entry': round(price, 2)}
+    elif price < sma20:
+        return {'type': 'SHORT', 'entry': round(price, 2)}
+    return {'type': 'HOLD', 'entry': round(price, 2)}
+
+def backtest_strategy(df):
+    df = df.copy()
+    df['sma'] = ta.trend.sma_indicator(close=df['Close'], window=20)
+    df['position'] = 0
+    df.loc[df['Close'] > df['sma'], 'position'] = 1
+    df.loc[df['Close'] < df['sma'], 'position'] = -1
+    df['returns'] = df['Close'].pct_change()
+    df['strategy_returns'] = df['returns'] * df['position'].shift(1)
+    total_return = df['strategy_returns'].sum()
+    return {
+        'total_return_%': round(total_return * 100, 2),
+        'win_ratio': round((df['strategy_returns'] > 0).mean() * 100, 2),
+        'num_trades': int((df['position'].diff() != 0).sum())
     }
