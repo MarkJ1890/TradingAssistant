@@ -4,7 +4,7 @@ from strategies import get_highs_lows, detect_recent_candle_pattern, suggest_ent
 import plotly.graph_objs as go
 
 st.set_page_config(page_title="TradingBot Dashboard", layout="wide")
-st.title("🧠 TradingBot - Analyse & Backtest (Fase 1)")
+st.title("🧠 TradingBot - Analyse & Backtest")
 
 tickers = {
     "EUR/USD": "EURUSD=X",
