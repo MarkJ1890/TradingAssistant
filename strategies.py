@@ -27,9 +27,12 @@ def detect_recent_candle_pattern(df):
     return result[-1] if result else "No clear pattern"
 
 def suggest_entry(df):
-    last = df.iloc[-1]
-    sma20 = ta.trend.sma_indicator(close=df['Close'], window=20).iloc[-1]
-    price = last['Close']
+    close_series = df['Close']
+    if isinstance(close_series, pd.DataFrame):
+        close_series = close_series.squeeze()
+    close_series = close_series.astype(float)
+    sma20 = ta.trend.sma_indicator(close=close_series, window=20).iloc[-1]
+    price = close_series.iloc[-1]
     if price > sma20:
         return {'type': 'LONG', 'entry': round(price, 2)}
     elif price < sma20:
@@ -38,7 +41,7 @@ def suggest_entry(df):
 
 def backtest_strategy(df):
     df = df.copy()
-    df['sma'] = ta.trend.sma_indicator(close=df['Close'], window=20)
+    df['sma'] = ta.trend.sma_indicator(close=df['Close'].astype(float), window=20)
     df['position'] = 0
     df.loc[df['Close'] > df['sma'], 'position'] = 1
     df.loc[df['Close'] < df['sma'], 'position'] = -1
