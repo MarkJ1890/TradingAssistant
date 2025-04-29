@@ -16,10 +16,10 @@ def detect_recent_candle_pattern(df):
     last = df.iloc[-5:]
     result = []
     for i in range(1, len(last)):
-        open_prev = last['Open'].iloc[i-1]
-        close_prev = last['Close'].iloc[i-1]
-        open_now = last['Open'].iloc[i]
-        close_now = last['Close'].iloc[i]
+        open_prev = float(last['Open'].iloc[i-1])
+        close_prev = float(last['Close'].iloc[i-1])
+        open_now = float(last['Open'].iloc[i])
+        close_now = float(last['Close'].iloc[i])
         if close_prev < open_prev and close_now > open_now and close_now > close_prev:
             result.append("Bullish Engulfing")
         elif close_prev > open_prev and close_now < open_now and close_now < close_prev:
