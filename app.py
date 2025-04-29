@@ -23,19 +23,20 @@ if data.empty or data_5m.empty:
     st.error("Geen geldige data beschikbaar.")
 else:
     st.subheader("📉 Marktdata & Analyse")
-    st.write(f"Laatste prijs: {round(data['Close'].iloc[-1], 2)}")
+    last_price = round(data['Close'].iloc[-1], 2)
+    st.write(f"Laatste prijs: **${last_price}**")
 
     highs_lows = get_highs_lows(data)
-    st.metric("📈 High vandaag", highs_lows['today_high'])
-    st.metric("📉 Low vandaag", highs_lows['today_low'])
-    st.metric("📈 High gisteren", highs_lows['yesterday_high'])
-    st.metric("📉 Low gisteren", highs_lows['yesterday_low'])
+    st.metric("📈 High vandaag", f"${highs_lows['today_high']}")
+    st.metric("📉 Low vandaag", f"${highs_lows['today_low']}")
+    st.metric("📈 High gisteren", f"${highs_lows['yesterday_high']}")
+    st.metric("📉 Low gisteren", f"${highs_lows['yesterday_low']}")
 
     pattern = detect_recent_candle_pattern(data_5m)
     st.write(f"🕯️ Laatste 4u candle patroon (5m): `{pattern}`")
 
     entry = suggest_entry(data)
-    st.write(f"💡 Voorgestelde positie: **{entry['type']}** rond prijs **{entry['entry']}**")
+    st.write(f"💡 Voorgestelde positie: **{entry['type']}** rond prijs **${entry['entry']}**")
 
     st.subheader("🔁 Backtest op SMA20-strategie")
     bt = backtest_strategy(data)
