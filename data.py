@@ -1,12 +1,13 @@
 import yfinance as yf
 import pandas as pd
 
-def get_data(ticker: str, period='90d', interval='1h'):
+def get_data(ticker: str, period='5d', interval='1h'):
     try:
-        data = yf.download(ticker, period=period, interval=interval)
-        if data.empty or len(data.columns) < 4:
-            raise ValueError("Geen geldige data gevonden.")
-        return data
+        df = yf.download(ticker, period=period, interval=interval)
+        return df
     except Exception as e:
-        print(f"Fout bij ophalen van data voor {ticker}: {e}")
+        print(f"Fout bij ophalen van data: {e}")
         return pd.DataFrame()
+
+def get_data_5m(ticker: str):
+    return yf.download(ticker, period='1d', interval='5m')
