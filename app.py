@@ -1,10 +1,10 @@
 import streamlit as st
-from data import get_data
-from strategies import generate_signals
+from data import get_data, get_data_5m
+from strategies import get_highs_lows, detect_recent_candle_pattern, suggest_entry, backtest_strategy
 import plotly.graph_objs as go
 
-st.set_page_config(page_title="TradingBot AI", layout="wide")
-st.title("🤖 TradingBot Voorspellende Analyse")
+st.set_page_config(page_title="TradingBot Dashboard", layout="wide")
+st.title("🧠 TradingBot - Analyse & Backtest (Fase 1)")
 
 tickers = {
     "EUR/USD": "EURUSD=X",
@@ -17,21 +17,33 @@ ticker_label = st.selectbox("Kies een markt", list(tickers.keys()))
 ticker = tickers[ticker_label]
 
 data = get_data(ticker)
-signal_info = generate_signals(data, ticker=ticker_label)
+data_5m = get_data_5m(ticker)
 
-st.subheader(f"Analyse voor {ticker_label}")
-st.write(f"**Signaal**: `{signal_info['signal']}`")
-st.write(f"**Confidence**: {signal_info['confidence']}%")
-st.write(f"**Sentiment**: `{signal_info['sentiment']}`")
-st.write(f"**Patroon**: `{signal_info['pattern']}`")
-st.write(f"**Verwachte richting**: `{signal_info['expected_direction']}`")
-st.write("**Redenen**:")
-for reason in signal_info["reasons"]:
-    st.markdown(f"- {reason}")
+if data.empty or data_5m.empty:
+    st.error("Geen geldige data beschikbaar.")
+else:
+    st.subheader("📉 Marktdata & Analyse")
+    st.write(f"Laatste prijs: {round(data['Close'].iloc[-1], 2)}")
 
-st.write(f"**Laatste prijs (entry)**: {signal_info['entry']}")
+    highs_lows = get_highs_lows(data)
+    st.metric("📈 High vandaag", highs_lows['today_high'])
+    st.metric("📉 Low vandaag", highs_lows['today_low'])
+    st.metric("📈 High gisteren", highs_lows['yesterday_high'])
+    st.metric("📉 Low gisteren", highs_lows['yesterday_low'])
 
-if not data.empty:
+    pattern = detect_recent_candle_pattern(data_5m)
+    st.write(f"🕯️ Laatste 4u candle patroon (5m): `{pattern}`")
+
+    entry = suggest_entry(data)
+    st.write(f"💡 Voorgestelde positie: **{entry['type']}** rond prijs **{entry['entry']}**")
+
+    st.subheader("🔁 Backtest op SMA20-strategie")
+    bt = backtest_strategy(data)
+    st.write(f"Totale rendement: {bt['total_return_%']}%")
+    st.write(f"Win ratio: {bt['win_ratio']}%")
+    st.write(f"Aantal trades: {bt['num_trades']}")
+
+    st.subheader("📊 Prijsactie")
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
         x=data.index,
@@ -41,7 +53,5 @@ if not data.empty:
         close=data['Close'],
         name='Candles'
     ))
-    fig.update_layout(title="Prijsactie", height=600)
+    fig.update_layout(title="Candlestick chart", height=600)
     st.plotly_chart(fig, use_container_width=True)
-else:
-    st.warning("Geen geldige data gevonden.")
