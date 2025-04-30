@@ -26,18 +26,25 @@ def detect_recent_candle_pattern(df):
             result.append("Bearish Engulfing")
     return result[-1] if result else "No clear pattern"
 
-def suggest_entry(df):
+def suggest_entry(df, pattern=None):
     close_series = df['Close']
     if isinstance(close_series, pd.DataFrame):
         close_series = close_series.squeeze()
     close_series = close_series.astype(float)
-    sma20 = ta.trend.sma_indicator(close=close_series, window=20).iloc[-1]
+
     price = close_series.iloc[-1]
-    if price > sma20:
-        return {'type': 'LONG', 'entry': round(price, 2)}
+    sma20 = ta.trend.sma_indicator(close=close_series, window=20).iloc[-1]
+
+    if pattern == "Bearish Engulfing":
+        return {'type': 'SHORT', 'entry': round(price, 2), 'reason': 'Bearish Engulfing pattern'}
+    elif pattern == "Bullish Engulfing":
+        return {'type': 'LONG', 'entry': round(price, 2), 'reason': 'Bullish Engulfing pattern'}
+    elif price > sma20:
+        return {'type': 'LONG', 'entry': round(price, 2), 'reason': 'Price above SMA20'}
     elif price < sma20:
-        return {'type': 'SHORT', 'entry': round(price, 2)}
-    return {'type': 'HOLD', 'entry': round(price, 2)}
+        return {'type': 'SHORT', 'entry': round(price, 2), 'reason': 'Price below SMA20'}
+    
+    return {'type': 'HOLD', 'entry': round(price, 2), 'reason': 'Geen duidelijk signaal'}
 
 def backtest_strategy(df):
     df = df.copy()
