@@ -1,5 +1,5 @@
 import streamlit as st
-from data import get_data, get_data_5m
+from data import get_data
 from strategies import get_highs_lows, detect_recent_candle_pattern, suggest_entry, backtest_strategy
 import plotly.graph_objs as go
 
@@ -16,10 +16,10 @@ tickers = {
 ticker_label = st.selectbox("Kies een markt", list(tickers.keys()))
 ticker = tickers[ticker_label]
 
-data = get_data(ticker)
-data_5m = get_data_5m(ticker)
+data = get_data(ticker, period='5d', interval='1h')
+data_daily = get_data(ticker, period='10d', interval='1d')
 
-if data.empty or data_5m.empty:
+if data.empty or data_daily.empty:
     st.error("Geen geldige data beschikbaar.")
 else:
     st.subheader("📉 Marktdata & Analyse")
@@ -32,11 +32,12 @@ else:
     st.metric("📈 High gisteren", f"${highs_lows['yesterday_high']}")
     st.metric("📉 Low gisteren", f"${highs_lows['yesterday_low']}")
 
-    pattern = detect_recent_candle_pattern(data_5m)
-    st.write(f"🕯️ Laatste 4u candle patroon (5m): `{pattern}`")
+    pattern = detect_recent_candle_pattern(data_daily)
+    st.write(f"🕯️ Laatste candlepatroon (1D): `{pattern}`")
 
-    entry = suggest_entry(data)
+    entry = suggest_entry(data, pattern=pattern)
     st.write(f"💡 Voorgestelde positie: **{entry['type']}** rond prijs **${entry['entry']}**")
+    st.caption(f"Reden: {entry['reason']}")
 
     st.subheader("🔁 Backtest op SMA20-strategie")
     bt = backtest_strategy(data)
