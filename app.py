@@ -1,6 +1,11 @@
 import streamlit as st
 from data import get_data
-from strategies import get_highs_lows, detect_recent_candle_pattern, suggest_entry, backtest_strategy
+from strategies import (
+    get_highs_lows,
+    detect_recent_candle_pattern,
+    suggest_entry,
+    backtest_strategy
+)
 import plotly.graph_objs as go
 
 st.set_page_config(page_title="TradingBot Dashboard", layout="wide")
@@ -16,8 +21,9 @@ tickers = {
 ticker_label = st.selectbox("Kies een markt", list(tickers.keys()))
 ticker = tickers[ticker_label]
 
-data = get_data(ticker, period='5d', interval='1h')
-data_daily = get_data(ticker, period='10d', interval='1d')
+# Data ophalen
+data = get_data(ticker, period='5d', interval='1h')              # Voor analyse + grafiek
+data_daily = get_data(ticker, period='10d', interval='1d')       # Voor candlepatroon (daily)
 
 if data.empty or data_daily.empty:
     st.error("Geen geldige data beschikbaar.")
@@ -32,9 +38,11 @@ else:
     st.metric("📈 High gisteren", f"${highs_lows['yesterday_high']}")
     st.metric("📉 Low gisteren", f"${highs_lows['yesterday_low']}")
 
+    # Daily pattern detectie
     pattern = detect_recent_candle_pattern(data_daily)
     st.write(f"🕯️ Laatste candlepatroon (1D): `{pattern}`")
 
+    # Signaal op basis van pattern + prijs
     entry = suggest_entry(data, pattern=pattern)
     st.write(f"💡 Voorgestelde positie: **{entry['type']}** rond prijs **${entry['entry']}**")
     st.caption(f"Reden: {entry['reason']}")
